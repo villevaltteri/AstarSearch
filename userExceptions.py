@@ -1,0 +1,3 @@
+
+class BoardEmpty(Exception):
+    pass
