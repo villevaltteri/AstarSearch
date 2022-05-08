@@ -1,97 +1,73 @@
 from typing import List, Tuple
-from userExceptions import BoardEmpty
 
 
-def heuristic(y: int, x: int, y2: int, x2: int) -> int:
-    return abs(y2-y) + abs(x2-x)
+class AStarSearch:
+    def __init__(self, path: str) -> None:
+        self._path = path
+        self._open_list = []
+        self._end_point = None
+        self._start_point = None
+        self._board: List[List[int]] = []
+
+    def _heuristic(self, y: int, x: int) -> int:
+        return abs(self._end_point[0] - y) + abs(self._end_point[1] - x)
+
+    def _add_to_open_list(self, y: int, x: int, g: int, h: int) -> None:
+        self._open_list.append([y, x, g, h])
+
+    def _sort_open_points(self) -> None:
+        self._open_list.sort(key=lambda x: x[2] + x[3], reverse=True)
+
+    def _check_valid_point(self, y: int, x: int) -> bool:
+        valid_y = (0 <= y < len(self._board))
+        valid_x = (0 <= x < len(self._board[0]))
+        if valid_y and valid_x:
+            return self._board[y][x] == 0
+        return False
+
+    def _expand_neighbour_points(self, current: List[int]) -> None:
+        delta = [(1, 0), (0, 1), (-1, 0), (0, -1)]
+        for i in range(len(delta)):
+            y2 = current[0] + delta[i][0]
+            x2 = current[1] + delta[i][1]
+            if self._check_valid_point(y2, x2):
+                g2 = current[2] + 1
+                h2 = self._heuristic(y2, x2)
+                self._board[y2][x2] = 4
+                self._add_to_open_list(y2, x2, g2, h2)
+
+    def search(self) -> None:
+        y = self._start_point[0]
+        x = self._start_point[1]
+        g = 0
+        h = self._heuristic(y, x)
+        self._add_to_open_list(y, x, g, h)
+        while self._open_list:
+            self._sort_open_points()
+            current_point = self._open_list.pop()
+            y = current_point[0]
+            x = current_point[1]
+            self._board[y][x] = 2
+            if y == self._end_point[0] and x == self._end_point[1]:
+                for i in range(len(self._board)):
+                    for j in range(len(self._board[0])):
+                        print(f"{self._board[i][j]:<4}", end="")
+                    print()
+            self._expand_neighbour_points(current_point)
+
+    def load_board(self, start: Tuple[int, int], end: Tuple[int, int]) -> None:
+        try:
+            with open(self._path, 'r') as file:
+                while line := file.readline():
+                    self._board.append([int(c) for c in line if c.isalnum()])
+        except FileNotFoundError as e:
+            print(f"{e.strerror}: {e.filename} didn't match any file. Check the path name")
+        self._end_point = end
+        self._start_point = start
 
 
-def check_valid_cell(y: int, x: int, board: List[List[int]]) -> bool:
-    valid_y: bool = (0 <= y < len(board))
-    valid_x: bool = (0 <= x < len(board[0]))
-    if valid_y and valid_x:
-        return board[y][x] == 0
-    return False
-
-
-def add_to_open(y: int, x: int, h: int, g: int, open: List[List[int]], board: List[List[int]]) -> Tuple[List[List[int]], List[List[int]]]:
-    open.append([y, x, h, g])
-    board[y][x] = 4
-    return open, board
-
-
-def expand_neighbours(best_option: List[int], board: List[List[int]], open_points: List[List[int]], goal: Tuple[int, int]) -> List[List[int]]:
-    delta: List[Tuple[int, int]] = [(0, 1), (1, 0), (0, -1), (-1, 0)]
-    y = best_option[0]
-    x = best_option[1]
-    g = best_option[3]
-    for i in range(len(delta)):
-        new_y = y + delta[i][0]
-        new_x = x + delta[i][1]
-        if check_valid_cell(new_y, new_x, board):
-            new_h = heuristic(new_y, new_x, goal[0], goal[1])
-            new_g = g + 1
-            open_points, board = add_to_open(new_y, new_x, new_h, new_g, open_points, board)
-    return open_points
-
-
-def sort_points(open_points: List[List[int]]) -> List[List[int]]:
-    open_points.sort(key=lambda x: x[2] + x[3], reverse=True)
-    return open_points
-
-
-def search(board: List[List[int]], start: Tuple[int, int], end: Tuple[int, int]) -> List[List[int]]:
-    open_points: List[List[int]] = []
-    y = start[0]
-    x = start[1]
-    h = heuristic(y, x, end[0], end[1])
-    g = 0
-    open_points, board = add_to_open(y, x, h, g, open_points, board)
-    while not is_board_empty(open_points):
-        open_points = sort_points(open_points)
-        best_option: List[int] = open_points.pop()
-        new_y = best_option[0]
-        new_x = best_option[1]
-        board[new_y][new_x] = 2
-        if new_y == end[0] and new_x == end[1]:
-            board[end[0]][end[1]] = 2
-            return board
-        open_points = expand_neighbours(best_option, board, open_points, end)
-    return [[1]]
-
-def print_board(board: List[List[int]]) -> None:
-    for i in range(len(board)):
-        for j in range(len(board[0])):
-            print(board[i][j], end=" ")
-        print()
-
-
-def is_board_empty(board: List[List[int]]) -> bool:
-    return all(map(is_board_empty, board)) if isinstance(board, list) else False
-
-
-def parse_row(line: str) -> List[int]:
-    line = line.strip()
-    row: List[int] = [int(n) for n in line if n.isalnum()]
-    return row
-
-
-def load_board(path: str) -> List[List[int]]:
-    board: List[List[int]] = []
-    with open(path, 'r') as file:
-        lines: List[str] = file.readlines()
-    for line in lines:
-        line = parse_row(line)
-        board.append(line)
-    if is_board_empty(board):
-        raise BoardEmpty("Board is empty. Check the map.txt file")
-    return board
-
-
-
-path: str = "./map.txt"
-mapf = load_board(path)
-start = (0, 0)
-end = (5, 6)
-k = search(mapf, start, end)
-print_board(k)
+if __name__ == "__main__":
+    path = "./map.txt"
+    solver = AStarSearch(path)
+    solver.load_board((0, 0), (5, 6))
+    solver.search()
